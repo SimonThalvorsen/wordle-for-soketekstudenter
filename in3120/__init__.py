@@ -21,6 +21,7 @@ from .normalizer import (
 from .porterstemmer import PorterStemmer
 from .posting import Posting
 from .postinglist import PostingList, InMemoryPostingList, CompressedInMemoryPostingList
+from .postingsmerger import PostingsMerger
 from .sieve import Sieve
 from .similaritysearchengine import SimilaritySearchEngine
 from .soundex import Soundex

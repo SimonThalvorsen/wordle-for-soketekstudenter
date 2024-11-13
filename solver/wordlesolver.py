@@ -1,7 +1,8 @@
 # Import the necessary modules
+from functools import reduce
 
 from context import in3120
-
+from in3120 import Posting, PostingsMerger
 
 """
 Plan:
@@ -27,51 +28,38 @@ class WordleSolver:
         self.vectorizer = in3120.Vectorizer(
             self.corpus, self.invertedindex, in3120.Trie()
         )
-        print(len(self.corpus))
-        val = []
-        for x in self.invertedindex.get_postings_iterator(
-            list(self.invertedindex.get_indexed_terms())[0]
-        ):
-            val.append(
-                (
-                    self.corpus.get_document(x.document_id).get_field("body", ""),
-                    self.vectorizer.from_document(
-                        self.corpus.get_document(x.document_id), ["body"]
-                    ),
-                )
+
+        # sparsevector = self.vectorizer.from_document(self.corpus.get_document(doc_id), fields=["body"]).cosine(OTHER)
+        self.ranker = in3120.WordleRanker(self.corpus, self.invertedindex, self.vectorizer)
+        self.candidates = [
+            (
+                doc.get_field("body", ""),
+                list(reduce(
+                    PostingsMerger.intersection,
+                    [self.invertedindex.get_postings_iterator(char) for char in set(doc.get_field("body", ""))],
+                ))[0]
             )
-        #val.sort(key=lambda s: s[1], reverse=True)
-        #print(val)
-        print(len(val))
-        print(val[0][1].cosine(val[1][1]))
-
-        """
-        for x in self.invertedindex.get_indexed_terms():
-            print(x, self.invertedindex.get_document_frequency(x))
-            # out: letter, numDocumentsOccurs
-            for y in self.invertedindex.get_postings_iterator(x):
-                print(y)
-                out: doc_id, term_freq
-        """
-
-        self.ranker = in3120.WordleRanker(
-            [doc.get_field("body", "") for doc in self.corpus]
-        )
-
-        self.candidates = [doc.get_field("body", "") for doc in self.corpus]
+            for doc in self.corpus
+        ]
+        for e in self.candidates:
+            print(e)
         self.target_word = "crane"
+        print(self.rank_candidates_by_similarity(candidates=self.candidates, guess=("aback", 0)))
 
-    def rank_candidates_by_similarity(self, candidates, guess):
-        guess_vector = self.vectorizer.from_document(guess, fields=["body"])
+    def rank_candidates_by_similarity(self, candidates: list[tuple[str, Posting]], guess: tuple[str, int]):
         ranked_candidates = []
 
+        self.ranker.reset(guess[1])
         for candidate in candidates:
-            candidate_vector = self.vectorizer.from_document(candidate, fields=["body"])
-            similarity = guess_vector.cosine(candidate_vector)
-            ranked_candidates.append((candidate, similarity))
+            self.ranker.update(guess[0], 0, candidate[1])
+            ranked_candidates.append((candidate[0], self.ranker.evaluate()))
+            self.ranker.reset(guess[1])
+
 
         ranked_candidates.sort(key=lambda x: x[1], reverse=True)
+        print(ranked_candidates)
         return [candidate for candidate, _ in ranked_candidates]
+
 
     def filter_candidates(self, guess, feedback):
         """
