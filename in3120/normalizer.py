@@ -4,8 +4,8 @@
 
 import unicodedata
 from abc import ABC, abstractmethod
-from soundex import Soundex
-from porterstemmer import PorterStemmer
+from .soundex import Soundex
+from .porterstemmer import PorterStemmer
 
 
 class Normalizer(ABC):

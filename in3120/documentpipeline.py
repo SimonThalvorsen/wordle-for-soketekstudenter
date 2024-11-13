@@ -1,7 +1,7 @@
 # pylint: disable=missing-module-docstring
 
 from typing import List, Optional, Callable
-from document import Document
+from .document import Document
 
 
 class DocumentPipeline:
