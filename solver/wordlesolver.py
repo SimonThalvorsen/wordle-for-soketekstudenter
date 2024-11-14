@@ -1,5 +1,6 @@
 # Import the necessary modules
 from functools import reduce
+import random
 
 from context import in3120
 from in3120 import Posting, PostingsMerger
@@ -49,14 +50,11 @@ class WordleSolver:
             )
             for word in self.corpus
         ]
-        # for e in self.candidates:
-        #     print(e)
 
-        self.target_word = "abase"
-        # self.rank_candidates_by_similarity(
-        #     candidates=self.candidates, guess=(self.target_word)
-        # )
-        self.first_guess = "crane"
+        # doc = self.corpus.get_document(random.randint(0, self.corpus.size()))
+        # self.target_word = doc.get_field("body", "")
+        # print("Target word:", self.target_word)
+        self.first_guess = "slate"
 
     def rank_candidates_by_similarity(
         self, candidates: list[tuple[str, Posting]], guess: str
@@ -82,8 +80,26 @@ class WordleSolver:
         - '1' indicates yellow (wrong position),
         - '0' indicates gray (letter not in word).
         """
-        self.first_guess
-        pass
+        filtered_candidates = []
+        for candidate, posting in self.candidates:
+            match = True
+            for idx, (letter, status) in enumerate(feedback):
+                if status == "2":  # Green - correct position
+                    if candidate[idx] != letter:
+                        match = False
+                        break
+                elif status == "1":  # Yellow - wrong position
+                    if letter not in candidate or candidate[idx] == letter:
+                        match = False
+                        break
+                elif status == "0":  # Gray - not in word
+                    if letter in candidate:
+                        match = False
+                        break
+            if match:
+                filtered_candidates.append((candidate, posting))
+
+        self.candidates = filtered_candidates
 
     def guess_word(self):
         """
@@ -103,22 +119,53 @@ class WordleSolver:
         for attempt in range(max_attempts):
             guess = self.first_guess if attempt == 0 else self.guess_word()
             if guess is None:
-                print("No valid candidates left.")
-                return None
+                # print("No valid candidates left.")
+                return {
+                    "success": False,
+                    "attempts": attempt,
+                    "target_word": self.target_word,
+                }
 
-            print(f"Attempt {attempt + 1}: Guessing '{guess}'")
+            # print(f"Attempt {attempt + 1}: Guessing '{guess}'")
 
-            # Placeholder
+            # Placeholder for actual game feedback
             feedback = self.get_feedback(guess)
 
             if all(status == "2" for _, status in feedback):
-                print(f"Solution found in {attempt + 1} attempts: {guess}")
-                return guess
+                # print(f"Solution found in {attempt + 1} attempts: {guess}")
+                return {
+                    "success": True,
+                    "attempts": attempt + 1,
+                    "target_word": self.target_word,
+                }
 
-            self.filter_candidates(guess, feedback)
+            self.filter_candidates(feedback)
 
-        print("Max attempts reached. Solution not found.")
-        return None
+        # print("Max attempts reached. Solution not found.")
+        return {
+            "success": False,
+            "attempts": max_attempts,
+            "target_word": self.target_word,
+        }
+        # for attempt in range(max_attempts):
+        #     guess = self.first_guess if attempt == 0 else self.guess_word()
+        #     if guess is None:
+        #         print("No valid candidates left.")
+        #         return None
+        #
+        #     print(f"Attempt {attempt + 1}: Guessing '{guess}'")
+        #
+        #     # Placeholder
+        #     feedback = self.get_feedback(guess)
+        #
+        #     if all(status == "2" for _, status in feedback):
+        #         print(f"Solution found in {attempt + 1} attempts: {guess}")
+        #         return guess, attempt + 1, self.target_word
+        #
+        #     self.filter_candidates(feedback)
+        #
+        # print("Max attempts reached. Solution not found.")
+        # return None
 
     def get_feedback(self, guess):
         """
