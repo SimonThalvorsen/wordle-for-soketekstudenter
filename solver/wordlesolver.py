@@ -1,9 +1,7 @@
 # Import the necessary modules
-from functools import reduce
 import random
 
 from context import in3120
-from in3120 import Posting, PostingsMerger
 
 """
 Plan:
@@ -37,36 +35,31 @@ class WordleSolver:
         )
 
         # sparsevector = self.vectorizer.from_document(self.corpus.get_document(doc_id), fields=["body"]).cosine(OTHER)
-        self.ranker = in3120.WordleRanker(
-            self.corpus, self.invertedindex, self.vectorizer
-        )
+        # self.ranker = in3120.WordleRanker(
+        #     self.corpus, self.invertedindex, self.vectorizer
+        # )
 
-        # for x in self.invertedindex.get_postings_iterator("a"):
-        #     print(x)
-        self.candidates = [
-            (
-                word.get_field("body", ""),
-                *list(self.wordindex[word.get_field("body", "")]),
-            )
-            for word in self.corpus
-        ]
+        self.candidates = [word.get_field("body", "") for word in self.corpus]
 
         # doc = self.corpus.get_document(random.randint(0, self.corpus.size()))
         # self.target_word = doc.get_field("body", "")
         # print("Target word:", self.target_word)
         self.first_guess = "slate"
 
-    def rank_candidates_by_similarity(
-        self, candidates: list[tuple[str, Posting]], guess: str
-    ):
+    def rank_candidates_by_similarity(self, candidates: list[str], guess: str):
         ranked_candidates = []
-        guess_doc_id = self.wordindex[guess]
-
-        self.ranker.reset(guess_doc_id)
+        guess_vector = self.vectorizer.from_document(
+            self.corpus.get_document(list(self.wordindex[guess])[0].document_id),
+            ["body"],
+        )
         for candidate in candidates:
-            self.ranker.update(guess, 0, candidate[1])
-            ranked_candidates.append((candidate[0], self.ranker.evaluate()))
-            self.ranker.reset(guess_doc_id)
+            candidate_vector = self.vectorizer.from_document(
+                self.corpus.get_document(
+                    list(self.wordindex[candidate])[0].document_id
+                ),
+                ["body"],
+            )
+            ranked_candidates.append((candidate, guess_vector.cosine(candidate_vector)))
 
         ranked_candidates.sort(key=lambda x: x[1])
         return [candidate for candidate, _ in ranked_candidates]
@@ -81,7 +74,7 @@ class WordleSolver:
         - '0' indicates gray (letter not in word).
         """
         filtered_candidates = []
-        for candidate, posting in self.candidates:
+        for candidate in self.candidates:
             match = True
             for idx, (letter, status) in enumerate(feedback):
                 if status == "2":  # Green - correct position
@@ -97,7 +90,7 @@ class WordleSolver:
                         match = False
                         break
             if match:
-                filtered_candidates.append((candidate, posting))
+                filtered_candidates.append(candidate)
 
         self.candidates = filtered_candidates
 
@@ -119,20 +112,19 @@ class WordleSolver:
         for attempt in range(max_attempts):
             guess = self.first_guess if attempt == 0 else self.guess_word()
             if guess is None:
-                # print("No valid candidates left.")
+                print("No valid candidates left.")
                 return {
                     "success": False,
                     "attempts": attempt,
                     "target_word": self.target_word,
                 }
 
-            # print(f"Attempt {attempt + 1}: Guessing '{guess}'")
+            print(f"Attempt {attempt + 1}: Guessing '{guess}'")
 
-            # Placeholder for actual game feedback
             feedback = self.get_feedback(guess)
 
             if all(status == "2" for _, status in feedback):
-                # print(f"Solution found in {attempt + 1} attempts: {guess}")
+                print(f"Solution found in {attempt + 1} attempts: {guess}")
                 return {
                     "success": True,
                     "attempts": attempt + 1,
@@ -141,31 +133,12 @@ class WordleSolver:
 
             self.filter_candidates(feedback)
 
-        # print("Max attempts reached. Solution not found.")
+        print("Max attempts reached. Solution not found.")
         return {
             "success": False,
             "attempts": max_attempts,
             "target_word": self.target_word,
         }
-        # for attempt in range(max_attempts):
-        #     guess = self.first_guess if attempt == 0 else self.guess_word()
-        #     if guess is None:
-        #         print("No valid candidates left.")
-        #         return None
-        #
-        #     print(f"Attempt {attempt + 1}: Guessing '{guess}'")
-        #
-        #     # Placeholder
-        #     feedback = self.get_feedback(guess)
-        #
-        #     if all(status == "2" for _, status in feedback):
-        #         print(f"Solution found in {attempt + 1} attempts: {guess}")
-        #         return guess, attempt + 1, self.target_word
-        #
-        #     self.filter_candidates(feedback)
-        #
-        # print("Max attempts reached. Solution not found.")
-        # return None
 
     def get_feedback(self, guess):
         """

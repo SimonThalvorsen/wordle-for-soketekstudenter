@@ -1,3 +1,4 @@
+from random import randint
 from wordlesolver import WordleSolver
 import time
 
@@ -12,8 +13,12 @@ def main():
     f = open("answer-words.txt", "r")
     word_list = list(f.readlines())
     max_attempts = 6
+    num_words = 500
 
-    for word in word_list:
+    # for word in word_list:
+    for _ in range(num_words):
+        word = randint(0, len(word_list) - 1)
+        word = word_list[word]
         solver = WordleSolver()
         solver.target_word = word  # Set the target word for each run
         result = solver.solve(max_attempts=max_attempts)
@@ -30,7 +35,7 @@ def main():
 
     # Calculate and display summary
     print("\n=== Summary ===")
-    print(f"Total words attempted: {len(word_list)}")
+    print(f"Total words attempted: {num_words}")
     print(f"Total successful solves: {successful_solves}")
     print(
         f"Average attempts for successful solves: "
@@ -46,4 +51,5 @@ def main():
 
 
 if __name__ == "__main__":
+    # WordleSolver().solve()
     main()
