@@ -8,6 +8,7 @@ from in3120 import Vectorizer, InvertedIndex, Corpus
 from abc import ABC, abstractmethod
 from .posting import Posting
 
+
 class Ranker(ABC):
     """
     Abstract base class for rankers used together with document-at-a-time traversal.
@@ -44,7 +45,10 @@ class WordleRanker(Ranker):
     """
     A ranker optimized for Wordle by scoring based on letter frequency and positional feedback.
     """
-    def __init__(self, corpus: Corpus, inverted_index: InvertedIndex, vectorizer: Vectorizer):
+
+    def __init__(
+        self, corpus: Corpus, inverted_index: InvertedIndex, vectorizer: Vectorizer
+    ):
         self._score = 0.0
         self._document_id = None
         self._corpus = corpus
@@ -64,10 +68,15 @@ class WordleRanker(Ranker):
                 doc_id = doc.document_id
                 break
         assert doc_id is not None
-        if doc_id == posting.document_id: return # Same word, no need to guess twice, big optimization am I right? ;)
+        if doc_id == posting.document_id:
+            return  # Same word, no need to guess twice, big optimization am I right? ;)
 
-        guess_vector = self._vectorizer.from_document(self._corpus.get_document(doc_id), fields=["body"])
-        target_vector = self._vectorizer.from_document(self._corpus.get_document(posting.document_id), fields=["body"])
+        guess_vector = self._vectorizer.from_document(
+            self._corpus.get_document(doc_id), fields=["body"]
+        )
+        target_vector = self._vectorizer.from_document(
+            self._corpus.get_document(posting.document_id), fields=["body"]
+        )
         self._score += guess_vector.cosine(target_vector)
 
     def evaluate(self) -> float:

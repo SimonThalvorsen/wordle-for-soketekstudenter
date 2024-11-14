@@ -6,10 +6,9 @@ import time
 def main():
     st = time.time()
     solver = WordleSolver()
+    solver.solve()
     print("----%.2f----" % (time.time() - st))
 
 
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -25,43 +25,55 @@ class WordleSolver:
             tokenizer=self.tokenizer,
             fields=["body"],
         )
+        self.wordindex = in3120.InMemoryInvertedIndex(
+            corpus=self.corpus,
+            normalizer=in3120.SimpleNormalizer(),
+            tokenizer=in3120.SimpleTokenizer(),
+            fields=["body"],
+        )
         self.vectorizer = in3120.Vectorizer(
             self.corpus, self.invertedindex, in3120.Trie()
         )
 
         # sparsevector = self.vectorizer.from_document(self.corpus.get_document(doc_id), fields=["body"]).cosine(OTHER)
-        self.ranker = in3120.WordleRanker(self.corpus, self.invertedindex, self.vectorizer)
+        self.ranker = in3120.WordleRanker(
+            self.corpus, self.invertedindex, self.vectorizer
+        )
+
+        # for x in self.invertedindex.get_postings_iterator("a"):
+        #     print(x)
         self.candidates = [
             (
-                doc.get_field("body", ""),
-                list(reduce(
-                    PostingsMerger.intersection,
-                    [self.invertedindex.get_postings_iterator(char) for char in set(doc.get_field("body", ""))],
-                ))[0]
+                word.get_field("body", ""),
+                *list(self.wordindex[word.get_field("body", "")]),
             )
-            for doc in self.corpus
+            for word in self.corpus
         ]
-        for e in self.candidates:
-            print(e)
-        self.target_word = "crane"
-        print(self.rank_candidates_by_similarity(candidates=self.candidates, guess=("aback", 0)))
+        # for e in self.candidates:
+        #     print(e)
 
-    def rank_candidates_by_similarity(self, candidates: list[tuple[str, Posting]], guess: tuple[str, int]):
+        self.target_word = "abase"
+        # self.rank_candidates_by_similarity(
+        #     candidates=self.candidates, guess=(self.target_word)
+        # )
+        self.first_guess = "crane"
+
+    def rank_candidates_by_similarity(
+        self, candidates: list[tuple[str, Posting]], guess: str
+    ):
         ranked_candidates = []
+        guess_doc_id = self.wordindex[guess]
 
-        self.ranker.reset(guess[1])
+        self.ranker.reset(guess_doc_id)
         for candidate in candidates:
-            self.ranker.update(guess[0], 0, candidate[1])
+            self.ranker.update(guess, 0, candidate[1])
             ranked_candidates.append((candidate[0], self.ranker.evaluate()))
-            self.ranker.reset(guess[1])
+            self.ranker.reset(guess_doc_id)
 
-
-        ranked_candidates.sort(key=lambda x: x[1], reverse=True)
-        print(ranked_candidates)
+        ranked_candidates.sort(key=lambda x: x[1])
         return [candidate for candidate, _ in ranked_candidates]
 
-
-    def filter_candidates(self, guess, feedback):
+    def filter_candidates(self, feedback):
         """
         Filters candidates based on the feedback from a guess.
 
@@ -70,21 +82,18 @@ class WordleSolver:
         - '1' indicates yellow (wrong position),
         - '0' indicates gray (letter not in word).
         """
-
-    def rank_candidates(self):
-        """
-        Rank the remaining candidates and choose the best guess.
-        """
-        self.ranker.update_scores(self.candidates)
-        ranked_candidates = self.ranker.rank()
-        self.ranker.reset()
-        return ranked_candidates[0] if ranked_candidates else None
+        self.first_guess
+        pass
 
     def guess_word(self):
         """
         Make the next guess from the list of ranked candidates.
         """
-        return self.rank_candidates()
+        ranked_candidates = self.rank_candidates_by_similarity(
+            self.candidates, self.first_guess
+        )
+
+        return ranked_candidates[0] if ranked_candidates else None
 
     def solve(self, max_attempts=6):
         """
@@ -92,7 +101,7 @@ class WordleSolver:
         or maximum attempts are reached.
         """
         for attempt in range(max_attempts):
-            guess = "resin" if attempt == 0 else self.guess_word()
+            guess = self.first_guess if attempt == 0 else self.guess_word()
             if guess is None:
                 print("No valid candidates left.")
                 return None
@@ -102,12 +111,10 @@ class WordleSolver:
             # Placeholder
             feedback = self.get_feedback(guess)
 
-            # If all letters are green, we found the solution
             if all(status == "2" for _, status in feedback):
                 print(f"Solution found in {attempt + 1} attempts: {guess}")
                 return guess
 
-            # Filter candidates based on feedback
             self.filter_candidates(guess, feedback)
 
         print("Max attempts reached. Solution not found.")
