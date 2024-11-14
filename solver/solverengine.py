@@ -5,7 +5,7 @@ from context import in3120
 
 class SolverSearchEngine :
 
-    def __init__(self, corpus: List[str]) -> None:
+    def __init__(self, corpus: in3120.Corpus) -> None:
         """
         class that, from a feedback and the guessed word, returns a list of indices of all the possible words using get_possible_matches()
         """
@@ -82,24 +82,12 @@ class SolverSearchEngine :
 
 #Example:
 
-corpus = [
-    "aahed",
-    "aalii",
-    "aargh",
-    "aarti",
-    "abaca",
-    "abaci",
-    "abacs",
-    "abaft",
-    "black",
-    "blurs"
-    ]
+corpus = in3120.InMemoryCorpus(filenames="answer-words.txt")
 
 solverengine = SolverSearchEngine(corpus)
 
 guess = "aback"
 feedback = [('a', '0'), ('b', '1'), ('a', '2'), ('c', '2'), ('k', '2')]
 result = solverengine.get_possible_matches(feedback, guess)
-
 for i in result :
     print(corpus[i])

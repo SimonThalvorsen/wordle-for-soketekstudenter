@@ -4,13 +4,14 @@ from context import in3120
 
 class MyInvertedIndex() :
 
-    def __init__(self, corpus):
+    def __init__(self, corpus: in3120.Corpus):
         self._corpus = corpus
         self._posting_lists = defaultdict(list)
         self._build_index()
 
     def _build_index(self) -> None:
-        for i, w in enumerate(self._corpus):
+        for i, document in enumerate(self._corpus):
+            w = document.get_field("body", "")
             term_freq = Counter(w)
     
             for pos, c in enumerate(w) :
