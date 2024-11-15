@@ -52,6 +52,7 @@ class SolverSearchEngine :
                 # c is not in target and is duplicate
                 # remove all postings with tf > counter[c]
                 self._remove_duplicates(c, counter[c])
+                self._yellow(unwanted_terms, i,c)
             else :
                 # c is not in target and is not duplicate
                 self._gray(unwanted_terms, c)
