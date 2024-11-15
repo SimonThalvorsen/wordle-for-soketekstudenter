@@ -110,10 +110,9 @@ class SolverSearchEngine :
             if len(frontier_cursor_ids) >= required_minimum :
                 
                 word = self._corpus[document_id].get_field("body", "")
-                if all(c in word for c in letter_counts) : 
-                    if self._is_in_range(letter_counts, word) :
+                if all(c in word for c in letter_counts) and self._is_in_range(letter_counts, word) :
                     # checks if the word contains all the green and yellow letters and in the right amount.
-                        result.append(document_id)
+                    result.append(document_id)
         
 
             for i in frontier_cursor_ids:
