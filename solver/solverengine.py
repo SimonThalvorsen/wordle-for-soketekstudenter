@@ -18,6 +18,7 @@ class SolverSearchEngine :
                 unwanted_terms.add((term, pos))
 
     def _yellow(self, unwanted_terms: Set, position: int, char: str) -> Set[Tuple[str,int]] :
+        #should remove all the words that don't contain the letter c
         #returns all the words having the same letter at this position
         unwanted_terms.add((char, position))
         
@@ -35,9 +36,10 @@ class SolverSearchEngine :
             self._inverted_index._posting_lists[(term, pos)] = [posting for posting in posting_list if posting.term_frequency <= count]
 
     def _update_index(self, feedback, guess) -> Dict[Tuple[str,int],List[in3120.Posting]]:
-        # Example feedback format: [('a', '1'), ('b', '1'), ('a', '2'), ('c', '2'), ('k', '2')]
+        # Example feedback format: [('a', '0'), ('b', '1'), ('a', '2'), ('c', '2'), ('k', '2')]
         unwanted_terms = set()
         counter = {c:0 for c in guess}
+        char_counts = Counter(guess)
 
         for i, (c, score) in enumerate(feedback) :
             if score == '2' :
@@ -53,14 +55,30 @@ class SolverSearchEngine :
                 # remove all postings with tf > counter[c]
                 self._remove_duplicates(c, counter[c])
                 self._yellow(unwanted_terms, i,c)
-            else :
-                # c is not in target and is not duplicate
+            elif score == '0' and  char_counts[c] > 1:
+                # c is not in target and but is a duplicate in guessed word
+                self._yellow(unwanted_terms, i,c)
+            else :    
+                # c is not in target and appears only once in the guessed word
                 self._gray(unwanted_terms, c)
         
         #returns the inverted index posting lists pruned from the unwanted posting lists
         return {k:v for k,v in self._inverted_index._posting_lists.items() if k not in unwanted_terms}
 
-    def _merge(self) -> List[int]:
+    def _merge(self, letter_counts) -> List[int]:
+        """
+        letter counts: all the letters that have to be included and that the amount of them
+        for the feedback [('a', '0'), ('b', '1'), ('a', '2'), ('c', '2'), ('k', '2')]
+        we have:
+
+        {
+        "a" : 1
+        "b" : 1
+        "c" : 1
+        "k" : 1
+        }
+        
+        """
         #5-out-of-N AND
         result = []
         posting_lists = [iter(p) for p in self._inverted_index._posting_lists.values()]
@@ -76,7 +94,16 @@ class SolverSearchEngine :
             document_id = min(all_cursors[i].document_id for i in remaining_cursor_ids)
             frontier_cursor_ids = [i for i in remaining_cursor_ids if all_cursors[i].document_id == document_id]
 
-            if len(frontier_cursor_ids) >= required_minimum:
+            if len(frontier_cursor_ids) >= required_minimum :
+                """checks if in the frontier:
+                    green: c at that pos 
+                    yellow: at least one c but no at that pos 
+                    gray:
+                        there's only one c in the word
+                        there's only one c in the word and it's not at that pos
+                        there's no c in the word
+                
+                """
                 result.append(document_id)
 
             for i in frontier_cursor_ids:
@@ -95,12 +122,12 @@ class SolverSearchEngine :
 #Example:
 
 def test_corpus() :
-    guess = "speed" 
+    guess = "aback" 
     corpus = in3120.InMemoryCorpus(filenames="answer-words.txt")
 
     solverengine = SolverSearchEngine(corpus)
 
-    feedback = [('s', '0'), ('p', '0'), ('e', '1'), ('e', '0'), ('d', '0')]
+    feedback = [('a', '0'), ('b', '1'), ('a', '2'), ('c', '2'), ('k', '2')]
     result = solverengine.get_possible_matches(feedback, guess)
     for i in result :
         print(corpus[i])
@@ -120,3 +147,5 @@ def test_behaviors() :
         result = solverengine.get_possible_matches(feedbacks[i], "speed")
         for j in result :
             print(corpora[i][j])
+
+test_corpus()
