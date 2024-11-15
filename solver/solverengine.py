@@ -9,7 +9,8 @@ class SolverSearchEngine :
         """
         class that, from a feedback and the guessed word, returns a list of indices of all the possible words using get_possible_matches()
         """
-        self._inverted_index = MyInvertedIndex(corpus)
+        self._corpus = corpus
+        self._inverted_index = MyInvertedIndex(self._corpus)
 
     def _green(self, unwanted_terms: Set, position: int, char: str) -> Set[Tuple[str,int]]:
         #returns all the words having a different letter at this position
@@ -28,65 +29,77 @@ class SolverSearchEngine :
             if term == char :
                 unwanted_terms.add((term, pos))
 
-    def _remove_duplicates(self, char, count) :
-        t = set()
-        self._gray(t, char)
-        for (term, pos) in t :
-            posting_list = self._inverted_index._posting_lists[(term, pos)]
-            self._inverted_index._posting_lists[(term, pos)] = [posting for posting in posting_list if posting.term_frequency <= count]
-
-    def _update_index(self, feedback, guess) -> Dict[Tuple[str,int],List[in3120.Posting]]:
-        # Example feedback format: [('a', '0'), ('b', '1'), ('a', '2'), ('c', '2'), ('k', '2')]
-        unwanted_terms = set()
-        counter = {c:0 for c in guess}
-        char_counts = Counter(guess)
-
-        for i, (c, score) in enumerate(feedback) :
-            if score == '2' :
-                # c is correct
-                self._green(unwanted_terms, i, c)
-                counter[c] +=1
-            elif score == '1' :
-                # c is in the wrong pos 
-                self._yellow(unwanted_terms, i,c)
-                counter[c] +=1
-            elif score == '0' and counter[c] > 0 :
-                # c is not in target and is duplicate
-                # remove all postings with tf > counter[c]
-                self._remove_duplicates(c, counter[c])
-                self._yellow(unwanted_terms, i,c)
-            elif score == '0' and  char_counts[c] > 1:
-                # c is not in target and but is a duplicate in guessed word
-                self._yellow(unwanted_terms, i,c)
-            else :    
-                # c is not in target and appears only once in the guessed word
-                self._gray(unwanted_terms, c)
-        
-        #returns the inverted index posting lists pruned from the unwanted posting lists
-        return {k:v for k,v in self._inverted_index._posting_lists.items() if k not in unwanted_terms}
-
-    def _merge(self, letter_counts) -> List[int]:
+    def _get_letter_counts(self, feedback) :
         """
         letter counts: all the letters that have to be included and that the amount of them
         for the feedback [('a', '0'), ('b', '1'), ('a', '2'), ('c', '2'), ('k', '2')]
         we have:
 
+        letter: (number of non-gray; number of gray) 
         {
-        "a" : 1
-        "b" : 1
-        "c" : 1
-        "k" : 1
+        "a" : 2, 1
+        "b" : 1, 0
+        "c" : 1, 0
+        "k" : 1, 0
         }
         
         """
+        correct = [c for c, n in feedback if n!='0']
+        counter_1 = Counter(c for c,_ in feedback)
+        counter_2 = Counter(c for c,n in feedback if n=='0')
+
+        return {c:(counter_1[c],counter_2[c]) for c in correct if c in correct}
+
+    def _update_index(self, feedback, guess) -> Dict[Tuple[str,int],List[in3120.Posting]]:
+        # Example feedback format: [('a', '0'), ('b', '1'), ('a', '2'), ('c', '2'), ('k', '2')]
+        unwanted_terms = set()
+        char_counts = Counter(guess)
+    
+        """
+        checks if in the frontier:
+            green: c at that pos 
+            yellow: at least one c but no at that pos 
+            gray:
+                there's only X c in the word
+                there's only X c in the word and it's not at that pos
+                there's no c in the word
+        
+        """
+
+        for i, (c, score) in enumerate(feedback) :
+            if score == '2' :
+                self._green(unwanted_terms, i, c)
+            elif score == '1' :
+                self._yellow(unwanted_terms, i,c)
+            elif score == '0' and char_counts[c] > 1 :
+                self._yellow(unwanted_terms, i,c)
+            else :    
+                self._gray(unwanted_terms, c)
+        
+        #returns the inverted index posting lists pruned from the unwanted posting lists
+        return {k:v for k,v in self._inverted_index._posting_lists.items() if k not in unwanted_terms}
+
+    def _is_in_range(self, letter_counts, word) :
+        term_freq = Counter(word)
+        for c in letter_counts :
+            r1, r2 = letter_counts[c]
+            if r2 == 0 :
+                if term_freq[c] < r1 :
+                    return False
+            else :
+                if term_freq[c] != r1-r2 :
+                    return False
+        return True
+                
+    def _merge(self, letter_counts) -> List[int]:
         #5-out-of-N AND
         result = []
         posting_lists = [iter(p) for p in self._inverted_index._posting_lists.values()]
 
         required_minimum = 5
 
-        all_cursors = [next(p, None) for p in posting_lists]
-        remaining_cursor_ids = [i for i in range(len(all_cursors)) if all_cursors[i]]
+        all_cursors = [next(p, None) for p in posting_lists] #all postings of a layer
+        remaining_cursor_ids = [i for i in range(len(all_cursors)) if all_cursors[i]] #remaining posting_list iter (not none)
 
 
         while len(remaining_cursor_ids) >= required_minimum:
@@ -95,16 +108,13 @@ class SolverSearchEngine :
             frontier_cursor_ids = [i for i in remaining_cursor_ids if all_cursors[i].document_id == document_id]
 
             if len(frontier_cursor_ids) >= required_minimum :
-                """checks if in the frontier:
-                    green: c at that pos 
-                    yellow: at least one c but no at that pos 
-                    gray:
-                        there's only one c in the word
-                        there's only one c in the word and it's not at that pos
-                        there's no c in the word
                 
-                """
-                result.append(document_id)
+                word = self._corpus[document_id].get_field("body", "")
+                if all(c in word for c in letter_counts) : 
+                    if self._is_in_range(letter_counts, word) :
+                    # checks if the word contains all the green and yellow letters and in the right amount.
+                        result.append(document_id)
+        
 
             for i in frontier_cursor_ids:
                 all_cursors[i] = next(posting_lists[i], None)
@@ -116,18 +126,20 @@ class SolverSearchEngine :
     def get_possible_matches(self, feedback, guess) :
         #should be called after every step of the wordler solver
         self._inverted_index._posting_lists = self._update_index(feedback, guess)
-        return self._merge()
+        letter_counts = self._get_letter_counts(feedback)
+        print(letter_counts)
+        return self._merge(letter_counts)
     
 
 #Example:
 
-def test_corpus() :
-    guess = "aback" 
+def test_corpus(guess, feedback) :
+    # guess = "aback" 
     corpus = in3120.InMemoryCorpus(filenames="answer-words.txt")
 
     solverengine = SolverSearchEngine(corpus)
 
-    feedback = [('a', '0'), ('b', '1'), ('a', '2'), ('c', '2'), ('k', '2')]
+    # feedback = [('a', '0'), ('b', '1'), ('a', '2'), ('c', '2'), ('k', '2')]
     result = solverengine.get_possible_matches(feedback, guess)
     for i in result :
         print(corpus[i])
@@ -147,5 +159,3 @@ def test_behaviors() :
         result = solverengine.get_possible_matches(feedbacks[i], "speed")
         for j in result :
             print(corpora[i][j])
-
-test_corpus()
