@@ -11,39 +11,52 @@ class SolverSearchEngine :
         """
         self._inverted_index = MyInvertedIndex(corpus)
 
-    def _green(self, position: int, char: str) -> Set[Tuple[str,int]]:
+    def _green(self, unwanted_terms: Set, position: int, char: str) -> Set[Tuple[str,int]]:
         #returns all the words having a different letter at this position
-        terms = set()
         for term, pos in self._inverted_index._posting_lists.keys():
             if pos == position and term != char :
-                terms.add((term, pos))
-        return terms 
+                unwanted_terms.add((term, pos))
 
-    def _yellow(self, position: int, char: str) -> Set[Tuple[str,int]] :
+    def _yellow(self, unwanted_terms: Set, position: int, char: str) -> Set[Tuple[str,int]] :
         #returns all the words having the same letter at this position
-        return {(char, position)}
+        unwanted_terms.add((char, position))
         
-    def _gray(self, char: str) -> Set[Tuple[str,int]]:
+    def _gray(self, unwanted_terms: Set, char: str) -> Set[Tuple[str,int]]:
         #returns all the words having this letter
-        terms = set()
         for term, pos in self._inverted_index._posting_lists.keys():
             if term == char :
-                terms.add((term, pos))
-        return terms
+                unwanted_terms.add((term, pos))
+
+    def _remove_duplicates(self, char, count) :
+        t = set()
+        self._gray(t, char)
+        for (term, pos) in t :
+            posting_list = self._inverted_index._posting_lists[(term, pos)]
+            for posting in posting_list.copy():
+                if posting.term_frequency > count :
+                    posting_list.remove(posting)
 
     def _update_index(self, feedback, guess) -> Dict[Tuple[str,int],List[in3120.Posting]]:
         # Example feedback format: [('a', '1'), ('b', '1'), ('a', '2'), ('c', '2'), ('k', '2')]
         unwanted_terms = set()
-        term_freq = Counter(guess)
+        counter = {c:0 for c in guess}
 
         for i, (c, score) in enumerate(feedback) :
-            if score == '2' : # c is correct
-                unwanted_terms = unwanted_terms| self._green(i, c)
-            elif score == '0' and term_freq[c] < 2 : # c is not in target and is not duplicate
-                unwanted_terms = unwanted_terms| self._gray(c)
+            if score == '2' :
+                # c is correct
+                self._green(unwanted_terms, i, c)
+                counter[c] +=1
+            elif score == '1' :
+                # c is in the wrong pos 
+                self._yellow(unwanted_terms, i,c)
+                counter[c] +=1
+            elif score == '0' and counter[c] > 0 :
+                # c is not in target and is duplicate
+                # find all postings with tf > counter[c]
+                self._remove_duplicates(c, counter[c])
             else :
-                # c is in the wrong pos or c is duplicate
-                unwanted_terms = unwanted_terms| self._yellow(i,c)
+                # c is not in target and is not duplicate
+                self._gray(unwanted_terms, c)
         
         #returns the inverted index posting lists pruned from the unwanted posting lists
         return {k:v for k,v in self._inverted_index._posting_lists.items() if k not in unwanted_terms}
@@ -82,12 +95,29 @@ class SolverSearchEngine :
 
 #Example:
 
-corpus = in3120.InMemoryCorpus(filenames="answer-words.txt")
+def test_corpus() :
+    guess = "speed" 
+    corpus = in3120.InMemoryCorpus(filenames="answer-words.txt")
 
-solverengine = SolverSearchEngine(corpus)
+    solverengine = SolverSearchEngine(corpus)
 
-guess = "aback"
-feedback = [('a', '0'), ('b', '1'), ('a', '2'), ('c', '2'), ('k', '2')]
-result = solverengine.get_possible_matches(feedback, guess)
-for i in result :
-    print(corpus[i])
+    feedback = [('s', '0'), ('p', '0'), ('e', '1'), ('e', '1'), ('e', '0')]
+    result = solverengine.get_possible_matches(feedback, guess)
+    for i in result :
+        print(corpus[i])
+
+def test_behaviors() :
+    feedbacks = [[('s', '0'), ('p', '0'), ('e', '1'), ('e', '0'), ('d', '1')],
+    [('s', '1'), ('p', '0'), ('e', '1'), ('e', '1'), ('d', '0')],
+    [('s', '2'), ('p', '0'), ('e', '2'), ('e', '0'), ('d', '0')],
+    [('s', '0'), ('p', '1'), ('e', '2'), ('e', '1'), ('d', '0')]]
+    corpora = [in3120.InMemoryCorpus().add_document(in3120.InMemoryDocument(0, {'body': 'abide'})),
+    in3120.InMemoryCorpus().add_document(in3120.InMemoryDocument(0, {'body': 'erase'})),
+    in3120.InMemoryCorpus().add_document(in3120.InMemoryDocument(0, {'body': 'steal'})),
+    in3120.InMemoryCorpus().add_document(in3120.InMemoryDocument(0, {'body': 'crepe'}))]
+
+    for i in range(4) :
+        solverengine = SolverSearchEngine(corpora[i])
+        result = solverengine.get_possible_matches(feedbacks[i], "speed")
+        for j in result :
+            print(corpora[i][j])
