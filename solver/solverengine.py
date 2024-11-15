@@ -50,7 +50,7 @@ class SolverSearchEngine :
                 counter[c] +=1
             elif score == '0' and counter[c] > 0 :
                 # c is not in target and is duplicate
-                # find all postings with tf > counter[c]
+                # remove all postings with tf > counter[c]
                 self._remove_duplicates(c, counter[c])
             else :
                 # c is not in target and is not duplicate
