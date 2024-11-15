@@ -32,9 +32,7 @@ class SolverSearchEngine :
         self._gray(t, char)
         for (term, pos) in t :
             posting_list = self._inverted_index._posting_lists[(term, pos)]
-            for posting in posting_list.copy():
-                if posting.term_frequency > count :
-                    posting_list.remove(posting)
+            self._inverted_index._posting_lists[(term, pos)] = [posting for posting in posting_list if posting.term_frequency <= count]
 
     def _update_index(self, feedback, guess) -> Dict[Tuple[str,int],List[in3120.Posting]]:
         # Example feedback format: [('a', '1'), ('b', '1'), ('a', '2'), ('c', '2'), ('k', '2')]
@@ -101,7 +99,7 @@ def test_corpus() :
 
     solverengine = SolverSearchEngine(corpus)
 
-    feedback = [('s', '0'), ('p', '0'), ('e', '1'), ('e', '1'), ('e', '0')]
+    feedback = [('s', '0'), ('p', '0'), ('e', '1'), ('e', '0'), ('d', '0')]
     result = solverengine.get_possible_matches(feedback, guess)
     for i in result :
         print(corpus[i])
