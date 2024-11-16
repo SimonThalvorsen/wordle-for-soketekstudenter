@@ -1,7 +1,7 @@
 # Import the necessary modules
-import random
 
 from context import in3120
+from solver.solverengine import SolverSearchEngine
 
 """
 Plan:
@@ -34,12 +34,8 @@ class WordleSolver:
             self.corpus, self.invertedindex, in3120.Trie()
         )
 
-        # sparsevector = self.vectorizer.from_document(self.corpus.get_document(doc_id), fields=["body"]).cosine(OTHER)
-        # self.ranker = in3120.WordleRanker(
-        #     self.corpus, self.invertedindex, self.vectorizer
-        # )
-
-        self.candidates = [word.get_field("body", "") for word in self.corpus]
+        self.candidates = set(word.get_field("body", "") for word in self.corpus)
+        self.engine = SolverSearchEngine(self.corpus, self.candidates)
 
         # doc = self.corpus.get_document(random.randint(0, self.corpus.size()))
         # self.target_word = doc.get_field("body", "")
