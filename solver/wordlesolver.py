@@ -110,6 +110,15 @@ class WordleSolver:
         or maximum attempts are reached.
         """
         for attempt in range(max_attempts):
+            """
+            Tenkte at for hvert attempt, vi har en funksjon som bestemmer hvor mye vi skal explore.
+            når attempt er lav vi kan:
+                - velge at random et ord fra lista generert av solverengine.get_possible_matches(feedback, guess)
+                - velge ordet med lavest cosin likhet
+            Men når attempt er høy:
+                - velge ordet med høyest cosin likhet (Det er det den gjør allerede vel?)
+
+            """
             guess = self.first_guess if attempt == 0 else self.guess_word()
             if guess is None:
                 print("No valid candidates left.")
