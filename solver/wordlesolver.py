@@ -1,4 +1,4 @@
-# Import the necessary modules
+from copy import deepcopy
 
 from context import in3120
 from solver.solverengine import SolverSearchEngine
@@ -12,7 +12,7 @@ Plan:
 
 
 class WordleSolver:
-    def __init__(self):
+    def __init__(self, debug: bool = False):
         """
         Initialize the Wordle solver with a list of valid words.
         """
@@ -33,34 +33,44 @@ class WordleSolver:
         self.vectorizer = in3120.Vectorizer(
             self.corpus, self.invertedindex, in3120.Trie()
         )
+        self.all_words = set(word.get_field("body", "") for word in self.corpus)
 
-        self.candidates = set(word.get_field("body", "") for word in self.corpus)
-        self.engine = SolverSearchEngine(self.corpus, self.candidates)
+        self.candidates = deepcopy(self.all_words)
+        self.word_vectors = self._cache_word_vectors()
 
-        # doc = self.corpus.get_document(random.randint(0, self.corpus.size()))
-        # self.target_word = doc.get_field("body", "")
-        # print("Target word:", self.target_word)
+        self.engine = SolverSearchEngine(self.corpus, self.candidates, debug)
+
+        self.target_word = None
         self.first_guess = "slate"
 
-    def rank_candidates_by_similarity(self, candidates: list[str], guess: str):
-        ranked_candidates = []
-        guess_vector = self.vectorizer.from_document(
-            self.corpus.get_document(list(self.wordindex[guess])[0].document_id),
-            ["body"],
-        )
-        for candidate in candidates:
-            candidate_vector = self.vectorizer.from_document(
-                self.corpus.get_document(
-                    list(self.wordindex[candidate])[0].document_id
-                ),
-                ["body"],
+    def _cache_word_vectors(self):
+        """
+        Cache vector representations for all words in the corpus.
+        """
+        cache = {}
+        for word in self.candidates:
+            document_id = list(self.wordindex[word])[0].document_id
+            cache[word] = self.vectorizer.from_document(
+                self.corpus.get_document(document_id), ["body"]
             )
-            ranked_candidates.append((candidate, guess_vector.cosine(candidate_vector)))
+        return cache
 
-        ranked_candidates.sort(key=lambda x: x[1])
-        return [candidate for candidate, _ in ranked_candidates]
+    def rank_candidates_by_similarity(self, candidates: set[str], guess: str):
+        return [
+            candidate
+            for candidate, _ in sorted(
+                [
+                    (
+                        candidate,
+                        self.word_vectors[guess].cosine(self.word_vectors[candidate]),
+                    )
+                    for candidate in candidates
+                ],
+                key=lambda x: x[1],
+            )
+        ]
 
-    def filter_candidates(self, feedback):
+    def filter_candidates(self, feedback, guess):
         """
         Filters candidates based on the feedback from a guess.
 
@@ -69,26 +79,11 @@ class WordleSolver:
         - '1' indicates yellow (wrong position),
         - '0' indicates gray (letter not in word).
         """
-        filtered_candidates = []
-        for candidate in self.candidates:
-            match = True
-            for idx, (letter, status) in enumerate(feedback):
-                if status == "2":  # Green - correct position
-                    if candidate[idx] != letter:
-                        match = False
-                        break
-                elif status == "1":  # Yellow - wrong position
-                    if letter not in candidate or candidate[idx] == letter:
-                        match = False
-                        break
-                elif status == "0":  # Gray - not in word
-                    if letter in candidate:
-                        match = False
-                        break
-            if match:
-                filtered_candidates.append(candidate)
-
-        self.candidates = filtered_candidates
+        possible_indices = self.engine.get_possible_matches(feedback, guess)
+        self.candidates = [
+            self.corpus.get_document(idx).get_field("body", "")
+            for idx in possible_indices
+        ]
 
     def guess_word(self):
         """
@@ -105,6 +100,8 @@ class WordleSolver:
         Solve the Wordle game by iterating through guesses until the solution is found
         or maximum attempts are reached.
         """
+        if self.target_word is None:
+            print("Target word not set, exiting")
         for attempt in range(max_attempts):
             """
             Tenkte at for hvert attempt, vi har en funksjon som bestemmer hvor mye vi skal explore.
@@ -113,7 +110,6 @@ class WordleSolver:
                 - velge ordet med lavest cosin likhet
             Men når attempt er høy:
                 - velge ordet med høyest cosin likhet (Det er det den gjør allerede vel?)
-
             """
             guess = self.first_guess if attempt == 0 else self.guess_word()
             if guess is None:
@@ -136,7 +132,7 @@ class WordleSolver:
                     "target_word": self.target_word,
                 }
 
-            self.filter_candidates(feedback)
+            self.filter_candidates(feedback, guess)
 
         print("Max attempts reached. Solution not found.")
         return {
@@ -147,9 +143,6 @@ class WordleSolver:
 
     def get_feedback(self, guess):
         """
-        Placeholder function to simulate feedback for a given guess.
-        This should be replaced by actual feedback from the Wordle game.
-
         Returns:
         A list of tuples (letter, status: [0, 1, 2]) representing the feedback for each letter.
         """
@@ -176,3 +169,8 @@ class WordleSolver:
                 feedback[idx] = (letter, "0")
 
         return feedback
+
+    def reset(self, new_word: str) -> None:
+        self.target_word = new_word
+        self.candidates = deepcopy(self.all_words)
+        self.engine = SolverSearchEngine(self.corpus, self.candidates)

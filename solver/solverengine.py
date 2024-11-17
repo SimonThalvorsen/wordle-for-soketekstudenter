@@ -7,13 +7,14 @@ from wordleinvertedindex import WordleInvertedIndex
 
 class SolverSearchEngine:
 
-    def __init__(self, corpus: in3120.Corpus, wordlist: set[str]) -> None:
+    def __init__(self, corpus: in3120.Corpus, wordlist: set[str], debug: bool = False) -> None:
         """
         class that, from a feedback and the guessed word, returns a list of indices of all the possible words using get_possible_matches()
         """
         self._corpus = corpus
         self.wordlist = wordlist
         self.inverted_index = WordleInvertedIndex(corpus)
+        self.debug = debug
 
     def _green(
         self, unwanted_terms: Set, position: int, char: str
@@ -144,14 +145,14 @@ class SolverSearchEngine:
             ]
 
         # returns a list of word indices
-        print(result)
+        if self.debug: print(result)
         return result
 
     def get_possible_matches(self, feedback, guess):
         # should be called after every step of the wordler solver
         self.inverted_index.posting_lists = self._update_index(feedback, guess)
         letter_counts = self._get_letter_counts(feedback)
-        print(letter_counts)
+        if self.debug: print(letter_counts)
         return self._merge(letter_counts)
 
 
