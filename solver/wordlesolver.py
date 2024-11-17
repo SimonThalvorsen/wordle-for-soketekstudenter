@@ -1,4 +1,4 @@
-from copy import deepcopy
+from copy import deepcopy, copy
 
 from context import in3120
 from solver.solverengine import SolverSearchEngine
@@ -34,15 +34,15 @@ class WordleSolver:
         self.vectorizer = in3120.Vectorizer(
             self.corpus, self.invertedindex, in3120.Trie()
         )
-        self.all_words = set(word.get_field("body", "") for word in self.corpus)
+        self.all_words = set(self.wordindex.get_indexed_terms())
 
-        self.candidates = deepcopy(self.all_words)
+        self.candidates = copy(self.all_words)
         self.word_vectors = self._cache_word_vectors()
 
         self.engine = SolverSearchEngine(self.corpus, self.candidates, self.debug)
 
         self.target_word = None
-        self.first_guess = "slate"
+        self.guess = "slate"
 
     def _cache_word_vectors(self):
         """
@@ -80,10 +80,10 @@ class WordleSolver:
         - '1' indicates yellow (wrong position),
         - '0' indicates gray (letter not in word).
         """
-        possible_indices = self.engine.get_possible_matches(feedback, guess)
+        possible_docs = self.engine.get_possible_matches(feedback, guess)
         self.candidates = [
-            self.corpus.get_document(idx).get_field("body", "")
-            for idx in possible_indices
+            self.corpus.get_document(doc_id).get_field("body", "")
+            for doc_id in possible_docs
         ]
 
     def guess_word(self):
@@ -91,7 +91,7 @@ class WordleSolver:
         Make the next guess from the list of ranked candidates.
         """
         ranked_candidates = self.rank_candidates_by_similarity(
-            self.candidates, self.first_guess
+            self.candidates, self.guess
         )
 
         return ranked_candidates[0] if ranked_candidates else None
@@ -112,7 +112,7 @@ class WordleSolver:
             Men når attempt er høy:
                 - velge ordet med høyest cosin likhet (Det er det den gjør allerede vel?)
             """
-            guess = self.first_guess if attempt == 0 else self.guess_word()
+            guess = self.guess if attempt == 0 else self.guess_word()
             if guess is None:
                 print("No valid candidates left.")
                 return {
@@ -122,7 +122,6 @@ class WordleSolver:
                 }
 
             print(f"Attempt {attempt + 1}: Guessing '{guess}'")
-
             feedback = self.get_feedback(guess)
 
             if all(status == "2" for _, status in feedback):
@@ -134,6 +133,8 @@ class WordleSolver:
                 }
 
             self.filter_candidates(feedback, guess)
+            self.guess = guess
+
 
         print("Max attempts reached. Solution not found.")
         return {
@@ -173,5 +174,6 @@ class WordleSolver:
 
     def reset(self, new_word: str) -> None:
         self.target_word = new_word
+        self.guess = "slate"
         self.candidates = deepcopy(self.all_words)
         self.engine = SolverSearchEngine(self.corpus, self.candidates, self.debug)
