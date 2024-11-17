@@ -14,7 +14,7 @@ def main():
     f = open("answer-words.txt", "r")
     word_list = list(f.readlines())
     max_attempts = 6
-    solver = WordleSolver()
+    solver = WordleSolver(debug=True)
     num_iterations = 100
 
     # for word in word_list:

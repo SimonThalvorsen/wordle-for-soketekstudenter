@@ -16,6 +16,7 @@ class WordleSolver:
         """
         Initialize the Wordle solver with a list of valid words.
         """
+        self.debug = debug
         self.corpus = in3120.InMemoryCorpus(filenames="answer-words.txt")
         self.tokenizer = in3120.UnigramTokenizer()
         self.invertedindex = in3120.InMemoryInvertedIndex(
@@ -38,7 +39,7 @@ class WordleSolver:
         self.candidates = deepcopy(self.all_words)
         self.word_vectors = self._cache_word_vectors()
 
-        self.engine = SolverSearchEngine(self.corpus, self.candidates, debug)
+        self.engine = SolverSearchEngine(self.corpus, self.candidates, self.debug)
 
         self.target_word = None
         self.first_guess = "slate"
@@ -173,4 +174,4 @@ class WordleSolver:
     def reset(self, new_word: str) -> None:
         self.target_word = new_word
         self.candidates = deepcopy(self.all_words)
-        self.engine = SolverSearchEngine(self.corpus, self.candidates)
+        self.engine = SolverSearchEngine(self.corpus, self.candidates, self.debug)
